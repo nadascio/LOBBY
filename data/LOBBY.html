@@ -344,8 +344,8 @@
                 <img id="logo-img-next" class="logo-layer" src="logos/logo1.png" alt="Logo">
             </div>
             <div class="glass-panel">
-                <!-- Floating Coffee Centerpiece -->
-                <div style="font-size: 3.8rem; animation: floatIcon 3.5s ease-in-out infinite; margin-top: -1.5rem; margin-bottom: 0.8rem; filter: drop-shadow(0 15px 15px rgba(0,0,0,0.6)); display: inline-block; cursor: pointer;" onclick="lobbyPrompt('Inspiración','¡Disfruta tu sesión y tu café! ☕',null,false)" title="Inspiración">☕</div>
+                <!-- Floating Centerpiece (Dynamic) -->
+                <div id="centerpiece-icon" style="font-size: 3.8rem; animation: floatIcon 3.5s ease-in-out infinite; margin-top: -1.5rem; margin-bottom: 0.8rem; filter: drop-shadow(0 15px 15px rgba(0,0,0,0.6)); display: inline-block; cursor: pointer;" onclick="showCenterpiecePrompt()" title="Modalidad">☕</div>
 
                 <div class="team-tag flex-gap-small">
                     <span id="team-tag-text" contenteditable="true" onblur="saveContent('team-tag-text')">TAX TECHNOLOGY</span>
@@ -389,6 +389,17 @@
                 <div id="bubble-logo" class="bubble-selector"></div>
             </button>
 
+            <button class="tool-btn only-lobby" onclick="showBubble('mod')" title="Modalidad">
+                <span id="tool-mod-icon" style="font-size:1.4rem;">☕</span>
+                <div id="bubble-mod" class="bubble-selector">
+                    <span class="bubble-option" onclick="applyModality('coffee');event.stopPropagation();" title="Coffee Break">☕</span>
+                    <span class="bubble-option" onclick="applyModality('brunch');event.stopPropagation();" title="Brunch">🥐</span>
+                    <span class="bubble-option" onclick="applyModality('lunch');event.stopPropagation();" title="Almuerzo">🍱</span>
+                    <span class="bubble-option" onclick="applyModality('meeting');event.stopPropagation();" title="Reunión">🤝</span>
+                    <span class="bubble-option" onclick="applyModality('party');event.stopPropagation();" title="Festejo">🎉</span>
+                </div>
+            </button>
+
             <button class="tool-btn" onclick="toggleMusicPlayer()" title="Música"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></button>
         </div>
         <div id="player-ribbon">
@@ -422,7 +433,7 @@
     </div>
 
     <div id="art-modal"><div class="modal-card"><span class="modal-icon">☕</span><h2 id="modal-title">Gestor</h2><p id="modal-msg">...</p><div class="modal-btns"><button class="modal-btn modal-btn-cancel" id="m-extra" style="display:none; background:#d32f2f; color:white; border:none;"></button><button class="modal-btn modal-btn-cancel" onclick="closeModal()">Cancelar</button><button class="modal-btn modal-btn-ok" id="m-ok">Aceptar</button></div></div></div>
-    <input type="file" id="html-picker" accept=".html" style="display:none;" onchange="handleFileSelected(this)">
+    <input type="file" id="html-picker" accept=".html,.pdf" style="display:none;" onchange="handleFileSelected(this)">
     <div id="yt-player-container"><div id="player"></div></div>
     <div id="final-countdown"></div>
     <iframe id="presentation-frame" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 100; border: none; background: white; display: none;"></iframe>
@@ -434,6 +445,15 @@
         let tabDots = 0;
         let coverPaths = {};  // idx -> path real (ej: "covers/portada9.jpg")
         let logoPaths  = {};  // idx -> path real
+        
+        const MODS = {
+            coffee:  { icon: '☕', label: 'Coffee Break', msg: '¡Disfruta tu sesión y tu café! ☕' },
+            brunch:  { icon: '🥐', label: 'Brunch',       msg: 'Hora de un delicioso brunch. 🥐' },
+            lunch:   { icon: '🍱', label: 'Almuerzo',     msg: '¡Buen provecho! Disfruta tu almuerzo. 🍱' },
+            meeting: { icon: '🤝', label: 'Reunión',      msg: 'Sesión de trabajo en equipo. 🤝' },
+            party:   { icon: '🎉', label: 'Festejo',      msg: '¡Festejemos este gran logro! 🎉' }
+        };
+        let currentMod = 'coffee';
 
         // ── Detección dinámica de assets ──────────────────────────────────
         async function initDynamicAssets() {
@@ -496,14 +516,27 @@
             checkL();
             const svL = localStorage.getItem('lobby_v6_2_logo') || 'logos/logo1.png';
             const svB = localStorage.getItem('lobby_v6_2_bg') || 'covers/portada1.png';
+            const svM = localStorage.getItem('lobby_v6_2_mod') || 'coffee';
             
             document.getElementById('logo-img').src = svL;
             document.getElementById('logo-img-next').src = svL;
             document.documentElement.style.setProperty('--bg-url', `url('${svB}')`);
+            applyModality(svM, false);
             
             checkL();
         }
-        function checkL() { document.getElementById('link-btn-icon').classList.toggle('active', pLink !== ""); }
+
+        function checkL() { 
+            const btn = document.getElementById('link-btn-icon');
+            btn.classList.toggle('active', pLink !== ""); 
+            if(pLink && pLink.startsWith('http')) {
+                btn.title = "Vinculado a Link Externo";
+            } else if(pLink) {
+                btn.title = "Vinculado a " + pLink;
+            } else {
+                btn.title = "Vincular Presentación";
+            }
+        }
 
         function showBubble(type) {
             document.querySelectorAll('.bubble-selector').forEach(b => { if(b.id !== 'bubble-'+type) b.classList.remove('visible'); });
@@ -526,8 +559,41 @@
             document.getElementById('bubble-'+type).classList.remove('visible');
         }
 
+        function applyModality(type, save = true) {
+            if(!MODS[type]) return;
+            currentMod = type;
+            const data = MODS[type];
+            document.getElementById('centerpiece-icon').innerText = data.icon;
+            document.getElementById('tool-mod-icon').innerText = data.icon;
+            
+            // Actualizar subtítulo si es el default
+            const sub = document.getElementById('sub-title');
+            const patterns = ["Prepare su café", "Prepare su almuerzo", "Prepare su brunch", "Prepare su refrigerio", "Prepárese para el éxito"];
+            if (patterns.some(p => sub.innerText.includes(p))) {
+                if(type === 'coffee') sub.innerText = "Iniciaremos en algunos minutos. Prepare su café.";
+                else if(type === 'brunch') sub.innerText = "Iniciaremos en algunos minutos. Prepare su brunch.";
+                else if(type === 'lunch') sub.innerText = "Iniciaremos en algunos minutos. Prepare su almuerzo.";
+                else if(type === 'meeting') sub.innerText = "Iniciaremos en algunos minutos. Prepárese para el éxito.";
+                else if(type === 'party') sub.innerText = "¡Bienvenidos a la celebración! Prepare su refrigerio.";
+            }
+
+            if(save) {
+                localStorage.setItem('lobby_v6_2_mod', type);
+                document.getElementById('bubble-mod').classList.remove('visible');
+            }
+        }
+
+        function showCenterpiecePrompt() {
+            const data = MODS[currentMod];
+            lobbyPrompt(data.label, data.msg, null, false);
+        }
+
         function lobbyPrompt(t, m, onOk, isConfirm = true, okText = "Aceptar", onExtra = null, extraText = "") {
             const modal = document.getElementById('art-modal'), btnOk = document.getElementById('m-ok'), btnCan = document.querySelector('.modal-btn-cancel'), btnExtra = document.getElementById('m-extra');
+            
+            // Sincronizar icono del modal con la modalidad actual
+            document.querySelector('.modal-icon').innerText = MODS[currentMod].icon;
+            
             document.getElementById('modal-title').innerText = t; document.getElementById('modal-msg').innerText = m;
             btnOk.innerText = okText;
             modal.style.display = 'flex'; btnCan.style.display = isConfirm ? 'block' : 'none';
@@ -540,11 +606,38 @@
         function vincularFlow() {
             if(pLink) {
                 lobbyPrompt("Presentación", "¿Desea modificar la presentación vinculada?", 
-                    () => document.getElementById('html-picker').click(), true, "MODIFICAR", 
+                    () => document.getElementById('html-picker').click(), true, "ARCHIVO LOCAL", 
                     () => { pLink = ""; checkL(); lobbyPrompt("Desvinculado", "La presentación actual ha sido desvinculada del Lobby.", null, false, "ENTENDIDO"); }, "DESVINCULAR"
                 );
+                // Inyectar botón de link manual en el modal abierto
+                const btnExtra = document.getElementById('m-extra');
+                btnExtra.style.display = 'block';
+                btnExtra.style.background = 'var(--secondary)';
+                btnExtra.innerText = "VINCULAR LINK";
+                btnExtra.onclick = () => { closeModal(); linkExternalFlow(); };
             } else {
-                lobbyPrompt("Presentación", "A continuación, seleccione el archivo HTML a vincular.", () => document.getElementById('html-picker').click(), true, "SELECCIONAR");
+                lobbyPrompt("Presentación", "Seleccione el método para vincular su presentación.", 
+                    () => document.getElementById('html-picker').click(), true, "ARCHIVO LOCAL",
+                    () => { linkExternalFlow(); }, "VINCULAR LINK"
+                );
+                document.getElementById('m-extra').style.background = 'var(--secondary)';
+            }
+        }
+
+        function linkExternalFlow() {
+            const url = window.prompt("Ingrese la URL de su presentación (Canva, Google Slides, etc.):\nEjemplo: https://www.canva.com/design/DA.../view?embed", pLink && pLink.startsWith('http') ? pLink : "");
+            if (url !== null) {
+                if (url.trim() === "") {
+                   pLink = "";
+                   checkL();
+                   lobbyPrompt("Desvinculado", "Se ha removido el link externo.", null, false);
+                } else if (url.startsWith("http")) {
+                   pLink = url.trim();
+                   checkL();
+                   lobbyPrompt("Vínculo", "Link externo vinculado con éxito.", null, false);
+                } else {
+                   lobbyPrompt("Error", "URL no válida. Debe comenzar con http:// o https://", () => linkExternalFlow(), true, "REINTENTAR");
+                }
             }
         }
 
@@ -618,7 +711,7 @@
         function fsh() { 
             if(pLink) {
                 const frame = document.getElementById('presentation-frame');
-                frame.src = '../' + pLink;
+                frame.src = pLink.startsWith('http') ? pLink : '../' + pLink;
                 frame.style.display = 'block';
                 document.getElementById('presentation-container').style.display = 'none';
                 document.getElementById('end-screen-container').style.display = 'none';
