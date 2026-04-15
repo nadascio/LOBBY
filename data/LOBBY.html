@@ -436,7 +436,7 @@
     <input type="file" id="html-picker" accept=".html,.pdf" style="display:none;" onchange="handleFileSelected(this)">
     <div id="yt-player-container"><div id="player"></div></div>
     <div id="final-countdown"></div>
-    <iframe id="presentation-frame" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 100; border: none; background: white; display: none;"></iframe>
+    <iframe id="presentation-frame" allowfullscreen allow="clipboard-write; encrypted-media; gyroscope; picture-in-picture" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 100; border: none; background: white; display: none;"></iframe>
     <div id="assets-preload"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
@@ -624,17 +624,34 @@
             }
         }
 
+        function cleanLink(u) {
+            u = u.trim();
+            if (u.includes('canva.com') && !u.includes('embed')) {
+                // Limpiar parámetros utm y asegurar formato /view?embed
+                if (u.includes('?')) u = u.split('?')[0];
+                if (u.endsWith('/view') || u.endsWith('/watch')) u += '?embed';
+                else if (u.includes('/design/')) {
+                    if (u.endsWith('/')) u = u.slice(0, -1);
+                    if (!u.endsWith('/view')) u += '/view';
+                    u += '?embed';
+                }
+            }
+            return u;
+        }
+
         function linkExternalFlow() {
-            const url = window.prompt("Ingrese la URL de su presentación (Canva, Google Slides, etc.):\nEjemplo: https://www.canva.com/design/DA.../view?embed", pLink && pLink.startsWith('http') ? pLink : "");
+            const msg = "Ingrese la URL de su presentación (Canva, Google Slides, etc.):\n\nNOTA: Para Canva, asegúrese de que el diseño tenga activa la opción 'Insertar' (Embed) en el menú Compartir.";
+            const url = window.prompt(msg, pLink && pLink.startsWith('http') ? pLink : "");
+            
             if (url !== null) {
                 if (url.trim() === "") {
                    pLink = "";
                    checkL();
                    lobbyPrompt("Desvinculado", "Se ha removido el link externo.", null, false);
-                } else if (url.startsWith("http")) {
-                   pLink = url.trim();
+                } else if (url.trim().startsWith("http")) {
+                   pLink = cleanLink(url);
                    checkL();
-                   lobbyPrompt("Vínculo", "Link externo vinculado con éxito.", null, false);
+                   lobbyPrompt("Vínculo", "Link externo vinculado con éxito." + (pLink.includes('canva.com') ? "\n\nSe ha aplicado el formato optimizado para Canva." : ""), null, false);
                 } else {
                    lobbyPrompt("Error", "URL no válida. Debe comenzar con http:// o https://", () => linkExternalFlow(), true, "REINTENTAR");
                 }
